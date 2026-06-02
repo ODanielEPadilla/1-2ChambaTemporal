@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import User from "../models/userModel.js";
 
-const BLOCKED_STATUSES = ["pendiente", "suspendido", "rechazado"];
+const BLOCKED_STATUSES = ["suspendido", "rechazado"];
 
 export const checkAccountStatus = async (
   req: Request,

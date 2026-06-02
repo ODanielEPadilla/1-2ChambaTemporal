@@ -8,6 +8,14 @@ export const createCurrentUser = async (req: Request, res: Response) => {
     const existingUser = await User.findOne({ auth0Id });
 
     if (existingUser) {
+      if (
+        existingUser.role === "cliente" &&
+        existingUser.status === "pendiente"
+      ) {
+        existingUser.status = "activo";
+        await existingUser.save();
+      }
+
       return res.status(200).json(existingUser);
     }
 
@@ -59,7 +67,7 @@ export const updateUserRole = async (req: Request, res: Response) => {
       }
     }
 
-    const status = role === "cliente" ? "pendiente" : "activo";
+    const status = "activo";
 
     const updatedUser = await User.findByIdAndUpdate(
       userId,
