@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import Job from "../models/jobModel";
 import User from "../models/userModel";
+import { attachClientProfiles } from "../utils/jobEnrichment.js";
 
 export const createJob = async (req: Request, res: Response) => {
   try {
@@ -24,9 +25,53 @@ export const createJob = async (req: Request, res: Response) => {
 
 export const getJobs = async (req: Request, res: Response) => {
   try {
-    const jobs = await Job.find().populate("client");
+    const { q, category, modality, location, board } = req.query;
+    const conditions: Record<string, unknown>[] = [];
 
-    res.json(jobs);
+    if (board === "true") {
+      conditions.push({ status: "abierto" });
+    }
+
+    if (category && typeof category === "string") {
+      conditions.push({ category });
+    }
+
+    if (modality && typeof modality === "string") {
+      conditions.push({ modality });
+    }
+
+    if (location && typeof location === "string" && location.trim()) {
+      const place = location.trim();
+      conditions.push({
+        $or: [
+          { location: { $regex: place, $options: "i" } },
+          { city: { $regex: place, $options: "i" } },
+        ],
+      });
+    }
+
+    if (q && typeof q === "string" && q.trim()) {
+      const search = q.trim();
+      conditions.push({
+        $or: [
+          { title: { $regex: search, $options: "i" } },
+          { description: { $regex: search, $options: "i" } },
+          { skillsRequired: { $elemMatch: { $regex: search, $options: "i" } } },
+        ],
+      });
+    }
+
+    const filter =
+      conditions.length > 0 ? { $and: conditions } : {};
+
+    const jobs = await Job.find(filter)
+      .populate("client")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const enrichedJobs = await attachClientProfiles(jobs);
+
+    res.json(enrichedJobs);
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Error al obtener los trabajos" });
@@ -41,13 +86,15 @@ export const getJobById = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Falta el ID del trabajo" });
     }
 
-    const job = await Job.findById(jobId).populate("client");
+    const job = await Job.findById(jobId).populate("client").lean();
 
     if (!job) {
       return res.status(404).json({ message: "Trabajo no encontrado" });
     }
 
-    res.json(job);
+    const [enrichedJob] = await attachClientProfiles([job]);
+
+    res.json(enrichedJob);
   } catch (error) {
     console.log(error);
     res.status(500).json({ message: "Error al obtener el trabajo" });

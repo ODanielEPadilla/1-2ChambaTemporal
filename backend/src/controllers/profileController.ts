@@ -2,8 +2,15 @@ import { Request, Response } from "express";
 import { v2 as cloudinary } from "cloudinary";
 import Profile from "../models/profileModel";
 import User from "../models/userModel";
+import { calculateAverageRating } from "../utils/ratingUtils.js";
 
 const uploadImage = async (file: Express.Multer.File) => {
+  if (!process.env.CLOUDINARY_CLOUD_NAME) {
+    throw new Error(
+      "Cloudinary no está configurado. Configura las variables de entorno para subir archivos."
+    );
+  }
+
   const image = file.buffer.toString("base64");
   const dataURI = `data:${file.mimetype};base64,${image}`;
 
@@ -16,7 +23,7 @@ const uploadImage = async (file: Express.Multer.File) => {
 
 export const getMyProfile = async (req: Request, res: Response) => {
   try {
-    const userId = req.params.userId;
+    const userId = String(req.params.userId || "");
 
     if (!userId) {
       return res.status(400).json({ message: "Falta el ID del usuario" });
@@ -28,6 +35,13 @@ export const getMyProfile = async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Perfil no encontrado" });
     }
 
+    const averageRating = await calculateAverageRating(userId);
+
+    if (profile.averageRating !== averageRating) {
+      profile.averageRating = averageRating;
+      await profile.save();
+    }
+
     res.json(profile);
   } catch (error) {
     console.log(error);
@@ -37,7 +51,7 @@ export const getMyProfile = async (req: Request, res: Response) => {
 
 export const createOrUpdateProfile = async (req: Request, res: Response) => {
   try {
-    const userId = req.params.userId;
+    const userId = String(req.params.userId || "");
 
     if (!userId) {
       return res.status(400).json({ message: "Falta el ID del usuario" });
@@ -62,9 +76,21 @@ export const createOrUpdateProfile = async (req: Request, res: Response) => {
       user: userId,
     };
 
-    if (req.file) {
-      const imageUrl = await uploadImage(req.file);
-      profileData.imageUrl = imageUrl;
+    const files = req.files as
+      | {
+          imageFile?: Express.Multer.File[];
+          verificationFile?: Express.Multer.File[];
+        }
+      | undefined;
+
+    if (files?.imageFile?.[0]) {
+      profileData.imageUrl = await uploadImage(files.imageFile[0]);
+    }
+
+    if (files?.verificationFile?.[0]) {
+      profileData.verificationDocumentUrl = await uploadImage(
+        files.verificationFile[0]
+      );
     }
 
     const profile = await Profile.findOneAndUpdate(

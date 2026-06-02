@@ -41,6 +41,32 @@ const jobSchema = new mongoose.Schema(
       required: true,
     },
 
+    location: {
+      type: String,
+      default: "Zacatecas, Zac.",
+    },
+
+    city: {
+      type: String,
+      default: "Zacatecas",
+    },
+
+    compensation: {
+      type: String,
+      default: "A convenir",
+    },
+
+    skillsRequired: {
+      type: [String],
+      default: [],
+    },
+
+    vacancies: {
+      type: Number,
+      default: 1,
+      min: 1,
+    },
+
     status: {
       type: String,
       enum: ["abierto", "en_proceso", "finalizado", "cancelado"],

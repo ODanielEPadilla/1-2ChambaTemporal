@@ -16,6 +16,13 @@ const upload = multer({
 });
 
 router.get("/:userId", getMyProfile);
-router.put("/:userId", upload.single("imageFile"), createOrUpdateProfile);
+router.put(
+  "/:userId",
+  upload.fields([
+    { name: "imageFile", maxCount: 1 },
+    { name: "verificationFile", maxCount: 1 },
+  ]),
+  createOrUpdateProfile
+);
 
 export default router;

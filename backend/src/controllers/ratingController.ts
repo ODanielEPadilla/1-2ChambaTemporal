@@ -1,8 +1,7 @@
 import { Request, Response } from "express";
 import Rating from "../models/ratingModel";
 import Profile from "../models/profileModel";
-import Job from "../models/jobModel";
-import User from "../models/userModel";
+import { calculateAverageRating } from "../utils/ratingUtils.js";
 
 export const createRating = async (req: Request, res: Response) => {
   try {
@@ -30,15 +29,12 @@ export const createRating = async (req: Request, res: Response) => {
 
     await newRating.save();
 
-    const ratings = await Rating.find({ reviewed });
-
-    const totalScore = ratings.reduce((sum, rating) => sum + rating.score, 0);
-    const averageRating = totalScore / ratings.length;
+    const averageRating = await calculateAverageRating(reviewed);
 
     await Profile.findOneAndUpdate(
       { user: reviewed },
       {
-        averageRating: Number(averageRating.toFixed(1)),
+        averageRating,
       }
     );
 

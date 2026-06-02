@@ -51,6 +51,11 @@ const profileSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+
+    verificationDocumentUrl: {
+      type: String,
+      default: "",
+    },
   },
   {
     timestamps: true,

@@ -24,7 +24,7 @@ export const createCurrentUser = async (req: Request, res: Response) => {
 export const updateUserRole = async (req: Request, res: Response) => {
   try {
     const userId = req.params.userId;
-    const { role } = req.body;
+    const { role, controlNumber } = req.body;
 
     if (!userId) {
       return res.status(400).json({ message: "Falta el ID del usuario" });
@@ -34,9 +34,41 @@ export const updateUserRole = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Rol inválido" });
     }
 
+    const existingUser = await User.findById(userId);
+
+    if (!existingUser) {
+      return res.status(404).json({ message: "Usuario no encontrado" });
+    }
+
+    if (role === "estudiante") {
+      const institutionalEmail = /@(itz|tec)\.edu\.mx$/i.test(
+        existingUser.email
+      );
+
+      if (!institutionalEmail) {
+        return res.status(400).json({
+          message:
+            "El registro de estudiante requiere un correo institucional @itz.edu.mx",
+        });
+      }
+
+      if (!controlNumber || String(controlNumber).trim().length < 8) {
+        return res.status(400).json({
+          message: "Debes ingresar un número de control válido del ITZ",
+        });
+      }
+    }
+
+    const status = role === "cliente" ? "pendiente" : "activo";
+
     const updatedUser = await User.findByIdAndUpdate(
       userId,
-      { role, onboardingCompleted: true },
+      {
+        role,
+        status,
+        onboardingCompleted: true,
+        controlNumber: role === "estudiante" ? String(controlNumber).trim() : "",
+      },
       { new: true }
     );
 
