@@ -1,13 +1,19 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import LoginButton from "../components/LoginButton";
+import BrandLogo from "../components/BrandLogo";
 import { useAuth0 } from "@auth0/auth0-react";
+import type { CurrentUser } from "../App";
 
 type Props = {
+  currentUser?: CurrentUser | null;
   onGoToDashboard?: () => void;
 };
 
-export default function VisitorHomePage({ onGoToDashboard }: Props) {
+export default function VisitorHomePage({
+  currentUser,
+  onGoToDashboard,
+}: Props) {
   const { isAuthenticated } = useAuth0();
   const navigate = useNavigate();
   const location = useLocation();
@@ -60,9 +66,6 @@ export default function VisitorHomePage({ onGoToDashboard }: Props) {
         <div className="landing-hero-inner">
           <form className="landing-search-bar" onSubmit={handleHeroSearch}>
             <div className="landing-search-field">
-              <span className="landing-search-icon" aria-hidden>
-                🔍
-              </span>
               <input
                 type="text"
                 placeholder="Título del empleo, palabras clave..."
@@ -74,9 +77,6 @@ export default function VisitorHomePage({ onGoToDashboard }: Props) {
             <div className="landing-search-divider" />
 
             <div className="landing-search-field">
-              <span className="landing-search-icon" aria-hidden>
-                📍
-              </span>
               <input
                 type="text"
                 placeholder="Zacatecas, Zac."
@@ -91,7 +91,7 @@ export default function VisitorHomePage({ onGoToDashboard }: Props) {
           </form>
 
           <div className="landing-hero-content">
-            <div className="landing-hero-logo">½</div>
+            <BrandLogo size="hero" className="landing-hero-brand" />
             <h1>Tu próxima media chamba comienza aquí</h1>
             <p className="landing-hero-lead">
               Conectamos estudiantes de Ingeniería en Sistemas Computacionales
@@ -108,7 +108,7 @@ export default function VisitorHomePage({ onGoToDashboard }: Props) {
                 className="landing-cta-primary"
                 onClick={handleComenzar}
               >
-                Comenzar →
+                Comenzar
               </button>
               <button
                 type="button"
@@ -236,6 +236,7 @@ export default function VisitorHomePage({ onGoToDashboard }: Props) {
             )}
           </article>
 
+          {currentUser?.role !== "estudiante" && (
           <article className="landing-audience-card landing-audience-card--accent">
             <h3>Para empresas</h3>
             <ul>
@@ -251,6 +252,7 @@ export default function VisitorHomePage({ onGoToDashboard }: Props) {
               onAuthenticatedClick={onGoToDashboard}
             />
           </article>
+          )}
         </div>
       </section>
 

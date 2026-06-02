@@ -34,7 +34,7 @@ export default function EmpleosPage({
 
         <span className="landing-eyebrow">Bolsa de empleo</span>
         <h1>Empleos disponibles</h1>
-        <p>Resultados en tiempo real según tu búsqueda y filtros.</p>
+        <p>Resultados en tiempo real.</p>
       </div>
 
       <JobBoard

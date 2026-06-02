@@ -9,8 +9,19 @@ import {
   formatModality,
   formatPostedDate,
 } from "../utils/jobLabels";
+import { formatRating } from "../utils/formatLabels";
+import AvatarPlaceholder from "./AvatarPlaceholder";
+import { useToast } from "./Toast";
 
 export const PENDING_APPLY_KEY = "pendingApplyJobId";
+
+type LoadJobsOptions = {
+  q?: string;
+  location?: string;
+  category?: string;
+  modality?: string;
+  useSidebarFilters?: boolean;
+};
 
 type Props = {
   currentUser?: CurrentUser | null;
@@ -125,17 +136,33 @@ export default function JobBoard({
   const [durationFilter, setDurationFilter] = useState("");
   const [sortBy, setSortBy] = useState("recientes");
   const { getAccessTokenSilently, isAuthenticated } = useAuth0();
+  const { showToast } = useToast();
 
-  const loadJobs = useCallback(async (overrides?: { q?: string; location?: string }) => {
+  const loadJobs = useCallback(async (options?: LoadJobsOptions) => {
     setIsLoading(true);
 
-    const q = (overrides?.q ?? searchQuery).trim() || undefined;
-    const location = (overrides?.location ?? locationQuery).trim() || undefined;
+    const useSidebar = options?.useSidebarFilters ?? true;
+    const qValue = options?.q ?? searchQuery;
+    const locationValue = options?.location ?? locationQuery;
+    const q = qValue.trim() || undefined;
+    const location = locationValue.trim() || undefined;
+    const category =
+      options?.category !== undefined
+        ? options.category || undefined
+        : useSidebar && categoryFilter
+          ? categoryFilter
+          : undefined;
+    const modality =
+      options?.modality !== undefined
+        ? options.modality || undefined
+        : useSidebar && modalityFilter
+          ? modalityFilter
+          : undefined;
 
     const searchParams = {
       q,
-      category: categoryFilter || undefined,
-      modality: modalityFilter || undefined,
+      category,
+      modality,
       location,
     };
 
@@ -149,7 +176,12 @@ export default function JobBoard({
         data = await getPublicJobs(searchParams);
       }
 
-      let results = data.filter((job) => matchesDuration(job, durationFilter));
+      let results = data.filter((job) =>
+        matchesDuration(
+          job,
+          options?.useSidebarFilters === false ? "" : durationFilter
+        )
+      );
 
       if (sortBy === "titulo") {
         results = [...results].sort((a, b) => a.title.localeCompare(b.title));
@@ -195,6 +227,7 @@ export default function JobBoard({
     loadJobs({
       q: initialSearchQuery,
       location: initialLocation,
+      useSidebarFilters: false,
     });
   }, [searchNonce, initialSearchQuery, initialLocation, loadJobs]);
 
@@ -202,7 +235,7 @@ export default function JobBoard({
 
   const handleSearch = (event?: React.FormEvent) => {
     event?.preventDefault();
-    loadJobs();
+    loadJobs({ useSidebarFilters: false });
   };
 
   const handleApplyClick = useCallback(
@@ -214,20 +247,21 @@ export default function JobBoard({
       }
 
       if (currentUser.role !== "estudiante") {
-        alert("Solo los estudiantes pueden postularse a las vacantes.");
+        showToast("Solo los estudiantes pueden postularse a las vacantes.", "error");
         return;
       }
 
       if (currentUser.status !== "activo") {
-        alert(
-          "Tu cuenta no está activa. Revisa el estado de tu perfil antes de postularte."
+        showToast(
+          "Tu cuenta no está activa. Revisa el estado de tu perfil antes de postularte.",
+          "error"
         );
         return;
       }
 
       setApplyingJob(job);
     },
-    [isAuthenticated, currentUser, onRequireLogin]
+    [isAuthenticated, currentUser, onRequireLogin, showToast]
   );
 
   useEffect(() => {
@@ -256,11 +290,14 @@ export default function JobBoard({
         token
       );
 
-      alert("Postulación enviada correctamente");
+      showToast("Postulación enviada correctamente", "success");
       setMessage("");
       setApplyingJob(null);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Error al postularse");
+      showToast(
+        error instanceof Error ? error.message : "Error al postularse",
+        "error"
+      );
     }
   };
 
@@ -271,6 +308,13 @@ export default function JobBoard({
     setModalityFilter("");
     setDurationFilter("");
     setSortBy("recientes");
+    loadJobs({
+      q: "",
+      location: "Zacatecas",
+      category: "",
+      modality: "",
+      useSidebarFilters: true,
+    });
   };
 
   const applyButtonLabel = !isAuthenticated
@@ -323,7 +367,6 @@ export default function JobBoard({
       <section className="jobs-search-hero jobs-search-hero--light">
         <form className="jobs-search-form jobs-search-form--indeed" onSubmit={handleSearch}>
           <div className="jobs-search-field">
-            <span className="jobs-input-icon">🔍</span>
             <input
               className="form-input"
               placeholder="Cargo o empresa"
@@ -333,7 +376,6 @@ export default function JobBoard({
           </div>
 
           <div className="jobs-search-field">
-            <span className="jobs-input-icon">📍</span>
             <input
               className="form-input"
               placeholder="Ciudad o estado"
@@ -351,35 +393,50 @@ export default function JobBoard({
           <button
             type="button"
             className={modalityFilter === "remoto" ? "active" : ""}
-            onClick={() =>
-              setModalityFilter(modalityFilter === "remoto" ? "" : "remoto")
-            }
+            onClick={() => {
+              const next = modalityFilter === "remoto" ? "" : "remoto";
+              setModalityFilter(next);
+              loadJobs({
+                modality: next,
+                useSidebarFilters: true,
+              });
+            }}
           >
             Remoto
           </button>
           <button
             type="button"
             className={modalityFilter === "presencial" ? "active" : ""}
-            onClick={() =>
-              setModalityFilter(
-                modalityFilter === "presencial" ? "" : "presencial"
-              )
-            }
+            onClick={() => {
+              const next = modalityFilter === "presencial" ? "" : "presencial";
+              setModalityFilter(next);
+              loadJobs({
+                modality: next,
+                useSidebarFilters: true,
+              });
+            }}
           >
             Presencial
           </button>
           <button
             type="button"
             className={categoryFilter === "desarrollo web" ? "active" : ""}
-            onClick={() =>
-              setCategoryFilter(
-                categoryFilter === "desarrollo web" ? "" : "desarrollo web"
-              )
-            }
+            onClick={() => {
+              const next =
+                categoryFilter === "desarrollo web" ? "" : "desarrollo web";
+              setCategoryFilter(next);
+              loadJobs({
+                category: next,
+                useSidebarFilters: true,
+              });
+            }}
           >
             Desarrollo web
           </button>
-          <button type="button" onClick={() => loadJobs()}>
+          <button
+            type="button"
+            onClick={() => loadJobs({ useSidebarFilters: false })}
+          >
             Actualizar
           </button>
         </div>
@@ -447,9 +504,9 @@ export default function JobBoard({
           <button
             type="button"
             className="primary-button jobs-apply-filters"
-            onClick={() => loadJobs()}
+            onClick={() => loadJobs({ useSidebarFilters: true })}
           >
-            Aplicar filtros
+            Aplicar
           </button>
         </aside>
 
@@ -494,7 +551,7 @@ export default function JobBoard({
                     </div>
                     <p className="jobs-company-line">{getCompanyName(job)}</p>
                     <div className="jobs-list-meta">
-                      <span>📍 {job.location || "Zacatecas, Zac."}</span>
+                      <span>{job.location || "Zacatecas, Zac."}</span>
                       <span>{formatModality(job.modality)}</span>
                     </div>
                     <p className="jobs-list-snippet">
@@ -516,10 +573,10 @@ export default function JobBoard({
                         <strong>{getCompanyName(selectedJob)}</strong>
                       </p>
                       <div className="jobs-detail-meta">
-                        <span>📍 {selectedJob.location || "Zacatecas, Zac."}</span>
+                        <span>{selectedJob.location || "Zacatecas, Zac."}</span>
                         <span>{formatModality(selectedJob.modality)}</span>
                         <span>{formatCategory(selectedJob.category)}</span>
-                        <span>⏱ {selectedJob.estimatedDuration}</span>
+                        <span>Duración: {selectedJob.estimatedDuration}</span>
                       </div>
                     </div>
                     <div className="jobs-detail-actions">
@@ -552,11 +609,20 @@ export default function JobBoard({
                   <section className="jobs-detail-section jobs-company-card">
                     <h4>Acerca de la empresa</h4>
                     <div className="jobs-company-profile">
-                      <div className="jobs-company-avatar">🏢</div>
+                      <div className="jobs-company-avatar">
+                        <AvatarPlaceholder
+                          name={getCompanyName(selectedJob)}
+                          imageUrl={selectedJob.clientProfile?.imageUrl}
+                          alt={getCompanyName(selectedJob)}
+                        />
+                      </div>
                       <div>
                         <h5>{getCompanyName(selectedJob)}</h5>
                         {selectedJob.clientProfile?.averageRating ? (
-                          <p>★ {selectedJob.clientProfile.averageRating} / 5</p>
+                          <p>
+                            Calificación:{" "}
+                            {formatRating(selectedJob.clientProfile.averageRating)}
+                          </p>
                         ) : null}
                         {selectedJob.clientProfile?.description && (
                           <p className="jobs-company-about">

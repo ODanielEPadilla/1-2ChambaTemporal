@@ -9,15 +9,20 @@ import AdminJobsPage from "../pages/AdminJobsPage";
 import AdminApplicationsPage from "../pages/AdminApplicationsPage";
 import AdminRatingsPage from "../pages/AdminRatingsPage";
 import LogoutButton from "../components/LogoutButton";
+import BrandLogo from "../components/BrandLogo";
+import AvatarPlaceholder from "../components/AvatarPlaceholder";
 import type { CurrentUser } from "../App";
 import { useEffect, useState } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
 import { getProfileByUserId } from "../api/profileApi";
+import { formatRoleLabel } from "../utils/formatLabels";
 
 type Props = {
   selectedView: string;
   setSelectedView: (view: string) => void;
   currentUser: CurrentUser | null;
+  openPublishForm?: boolean;
+  onPublishFormOpened?: () => void;
   onOpenJobBoard: () => void;
   onExitDashboard?: () => void;
 };
@@ -26,12 +31,15 @@ export default function DashboardLayout({
   selectedView,
   setSelectedView,
   currentUser,
+  openPublishForm = false,
+  onPublishFormOpened,
   onOpenJobBoard,
   onExitDashboard,
 }: Props) {
   const rol = currentUser?.role || "estudiante";
   const [averageRating, setAverageRating] = useState(0);
   const [profileImageUrl, setProfileImageUrl] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const { getAccessTokenSilently, user: auth0User } = useAuth0();
 
   useEffect(() => {
@@ -44,6 +52,7 @@ export default function DashboardLayout({
 
         setAverageRating(profile.averageRating ?? 0);
         setProfileImageUrl(profile.imageUrl || auth0User?.picture || "");
+        setCompanyName(profile.companyName || "");
       } catch (error) {
         console.log(error);
         setProfileImageUrl(auth0User?.picture || "");
@@ -63,29 +72,36 @@ export default function DashboardLayout({
           className="brand brand-btn"
           onClick={() => onExitDashboard?.()}
         >
-          <div className="logo">½</div>
-          <span>1/2Chamba</span>
+          <BrandLogo size="sm" />
         </button>
 
         <div className="topbar-user">
           <div className="topbar-avatar">
-            {avatarSrc ? (
-              <img src={avatarSrc} alt="Foto de perfil" />
-            ) : (
-              "👤"
-            )}
+            <AvatarPlaceholder
+              name={currentUser?.name}
+              imageUrl={avatarSrc}
+              alt="Foto de perfil"
+            />
           </div>
 
           <div>
-            <h1>{currentUser?.name || "Usuario"}</h1>
-            <p>{rol === "administrador" ? "Administrador" : rol}</p>
+            <h1>
+              {rol === "cliente" && companyName
+                ? companyName
+                : currentUser?.name || "Usuario"}
+            </h1>
+            <p>{formatRoleLabel(rol)}</p>
           </div>
         </div>
 
-        <div className="rating">
-          <span>Calificación promedio</span>
-          {averageRating > 0 ? `${averageRating} / 5` : "Sin calificaciones"}
-        </div>
+        {rol === "estudiante" && (
+          <div className="rating">
+            <span>Calificación promedio</span>
+            {averageRating > 0
+              ? `${averageRating} / 5`
+              : "Sin calificaciones"}
+          </div>
+        )}
       </header>
 
       <main className="dashboard">
@@ -117,7 +133,7 @@ export default function DashboardLayout({
               </button>
 
               <button onClick={() => setSelectedView("postulacionesRecibidas")}>
-                Postulaciones recibidas
+                Postulaciones
               </button>
 
               <button onClick={() => setSelectedView("calificaciones")}>
@@ -166,7 +182,11 @@ export default function DashboardLayout({
           )}
 
           {selectedView === "misTrabajos" && (
-            <MyJobsPage currentUser={currentUser} />
+            <MyJobsPage
+              currentUser={currentUser}
+              initialShowForm={openPublishForm}
+              onFormOpened={onPublishFormOpened}
+            />
           )}
 
           {selectedView === "postulaciones" && (

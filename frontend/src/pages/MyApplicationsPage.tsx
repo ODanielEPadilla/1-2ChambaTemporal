@@ -3,6 +3,8 @@ import type { CurrentUser } from "../App";
 import { getApplicationsByStudent } from "../api/applicationApi";
 import { createRating } from "../api/createRatingApi";
 import { useAuth0 } from "@auth0/auth0-react";
+import { formatApplicationStatus, getApplicationFeedback } from "../utils/formatLabels";
+import { useToast } from "../components/Toast";
 
 type Props = {
   currentUser: CurrentUser | null;
@@ -28,6 +30,7 @@ export default function MyApplicationsPage({ currentUser }: Props) {
   const [applications, setApplications] = useState<Application[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { getAccessTokenSilently } = useAuth0();
+  const { showToast } = useToast();
   const [ratingApplication, setRatingApplication] = useState<Application | null>(null);
   const [score, setScore] = useState(5);
   const [comment, setComment] = useState("");
@@ -72,16 +75,17 @@ export default function MyApplicationsPage({ currentUser }: Props) {
         token
       );
 
-      alert("Calificación guardada correctamente");
+      showToast("Calificación guardada correctamente", "success");
 
       setRatingApplication(null);
       setScore(5);
       setComment("");
     } catch (error) {
-      alert(
+      showToast(
         error instanceof Error
           ? error.message
-          : "Error al guardar calificación"
+          : "Error al guardar calificación",
+        "error"
       );
     }
   };
@@ -101,15 +105,14 @@ export default function MyApplicationsPage({ currentUser }: Props) {
         </button>
 
         <div className="detail-card">
-          <h2>Calificar empresa/cliente</h2>
+          <h2>Calificar empresa</h2>
 
           <p>
             <strong>Trabajo:</strong> {ratingApplication.job?.title}
           </p>
 
           <p>
-            <strong>Empresa/Cliente:</strong>{" "}
-            {ratingApplication.job?.client?.name}
+            <strong>Empresa:</strong> {ratingApplication.job?.client?.name}
           </p>
 
           <label className="form-label">Calificación</label>
@@ -130,7 +133,7 @@ export default function MyApplicationsPage({ currentUser }: Props) {
             className="form-textarea"
             value={comment}
             onChange={(e) => setComment(e.target.value)}
-            placeholder="Escribe un comentario sobre la empresa o cliente..."
+            placeholder="Escribe un comentario sobre la empresa..."
           />
 
           <button className="primary-button" onClick={handleCreateRating}>
@@ -142,38 +145,71 @@ export default function MyApplicationsPage({ currentUser }: Props) {
   }
 
   return (
-    <div>
-      <h2>Mis postulaciones</h2>
+    <div className="applications-page">
+      <header className="applications-page-header">
+        <span className="profile-eyebrow">Seguimiento</span>
+        <h2>Mis postulaciones</h2>
+        <p>
+          Aquí ves el estatus que asignó cada empresa a tu solicitud.
+        </p>
+      </header>
 
-      <div className="cards-grid">
-        {applications.map((application) => (
-          <article className="job-card" key={application._id}>
-            <h3>{application.job?.title}</h3>
+      {applications.length === 0 ? (
+        <div className="applications-empty">
+          <p>Aún no te has postulado a ninguna vacante.</p>
+        </div>
+      ) : (
+        <div className="applications-list">
+          {applications.map((application) => {
+            const feedback = getApplicationFeedback(application.status);
 
-            <p>
-              <strong>Empresa/Cliente:</strong>{" "}
-              {application.job?.client?.name}
-            </p>
-
-            <p>
-              <strong>Mensaje enviado:</strong> {application.message}
-            </p>
-
-            <span className={`status-badge ${application.status}`}>
-              {application.status}
-            </span>
-
-            {application.status === "aceptada" &&
-              application.job?.status === "finalizado" && (
-                <div className="card-actions">
-                  <button onClick={() => setRatingApplication(application)}>
-                    Calificar empresa/cliente
-                  </button>
+            return (
+            <article className="application-card" key={application._id}>
+              <div className="application-card-header">
+                <div>
+                  <h3>{application.job?.title}</h3>
+                  <p>
+                    <strong>Empresa:</strong>{" "}
+                    {application.job?.client?.name}
+                  </p>
                 </div>
+                <span
+                  className={`status-badge status-badge--${application.status}`}
+                >
+                  {formatApplicationStatus(application.status)}
+                </span>
+              </div>
+
+              <div className="application-card-message">
+                <strong>Tu mensaje</strong>
+                <p>{application.message}</p>
+              </div>
+
+              {feedback && (
+                <p
+                  className={`application-feedback application-feedback--${application.status}`}
+                >
+                  {feedback}
+                </p>
               )}
-          </article>
-        ))}
-      </div>
+
+              {application.status === "aceptada" &&
+                application.job?.status === "finalizado" && (
+                  <div className="card-actions">
+                    <button
+                      type="button"
+                      className="primary-button"
+                      onClick={() => setRatingApplication(application)}
+                    >
+                      Calificar empresa
+                    </button>
+                  </div>
+                )}
+            </article>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

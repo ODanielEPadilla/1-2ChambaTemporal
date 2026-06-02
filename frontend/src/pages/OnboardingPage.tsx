@@ -4,6 +4,8 @@ import type { CurrentUser } from "../App";
 import { updateUserRole } from "../api/userApi";
 import { updateProfile } from "../api/profileApi";
 import { REGISTER_INTENT_KEY } from "../components/LoginButton";
+import BrandLogo from "../components/BrandLogo";
+import { useToast } from "../components/Toast";
 
 type Props = {
   currentUser: CurrentUser;
@@ -28,13 +30,14 @@ export default function OnboardingPage({ currentUser, onFinish }: Props) {
   const [rfc, setRfc] = useState("");
   const [verificationFile, setVerificationFile] = useState<File | null>(null);
   const { getAccessTokenSilently } = useAuth0();
+  const { showToast } = useToast();
 
   const handleSave = async () => {
     try {
       const token = await getAccessTokenSilently();
 
       if (role === "cliente" && !verificationFile) {
-        alert("Debes adjuntar un documento oficial de verificación");
+        showToast("Debes adjuntar un documento oficial de verificación", "error");
         return;
       }
 
@@ -64,8 +67,9 @@ export default function OnboardingPage({ currentUser, onFinish }: Props) {
 
       onFinish(updatedUser);
     } catch (error) {
-      alert(
-        error instanceof Error ? error.message : "Error al configurar cuenta"
+      showToast(
+        error instanceof Error ? error.message : "Error al configurar cuenta",
+        "error"
       );
     }
   };
@@ -73,7 +77,7 @@ export default function OnboardingPage({ currentUser, onFinish }: Props) {
   return (
     <div className="home-page">
       <div className="home-card onboarding-card">
-        <div className="logo home-logo">½</div>
+        <BrandLogo size="lg" className="home-logo" />
 
         <h1>Configura tu cuenta</h1>
 
@@ -86,7 +90,7 @@ export default function OnboardingPage({ currentUser, onFinish }: Props) {
           }
         >
           <option value="estudiante">Estudiante ITZ</option>
-          <option value="cliente">Empresa / Cliente</option>
+          <option value="cliente">Empresa</option>
         </select>
 
         {role === "estudiante" && (

@@ -5,6 +5,7 @@ import {
   getRatingsGivenByUser,
 } from "../api/ratingApi";
 import { useAuth0 } from "@auth0/auth0-react";
+import AvatarPlaceholder from "../components/AvatarPlaceholder";
 
 type Props = {
   currentUser: CurrentUser | null;
@@ -87,7 +88,15 @@ export default function RatingsPage({ currentUser }: Props) {
 
         {ratings.map((rating) => (
           <article className="rating-card" key={rating._id}>
-            <div className="rating-avatar">👤</div>
+            <div className="rating-avatar">
+              <AvatarPlaceholder
+                name={
+                  activeTab === "received"
+                    ? rating.reviewer?.name
+                    : rating.reviewed?.name
+                }
+              />
+            </div>
 
             <div>
               <h3>

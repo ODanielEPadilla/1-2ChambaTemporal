@@ -1,6 +1,7 @@
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import type { CurrentUser } from "../App";
 import LoginButton from "../components/LoginButton";
+import BrandLogo from "../components/BrandLogo";
 
 type Props = {
   children: React.ReactNode;
@@ -39,8 +40,7 @@ export default function VisitorLayout({
       <header className="visitor-header">
         <div className="visitor-header-inner">
           <Link to="/" className="visitor-brand">
-            <span className="logo">½</span>
-            <span className="visitor-brand-text">1/2Chamba</span>
+            <BrandLogo size="sm" />
           </Link>
 
           <nav className="visitor-nav">
@@ -85,12 +85,14 @@ export default function VisitorLayout({
               <LoginButton label="Ingresar" className="visitor-login-btn" />
             )}
 
-            <LoginButton
-              label="Empresas / Publicar empleos"
-              intent="publish"
-              className="visitor-publish-btn"
-              onAuthenticatedClick={onGoToDashboard}
-            />
+            {currentUser?.role !== "estudiante" && (
+              <LoginButton
+                label="Empresas / Publicar empleos"
+                intent="publish"
+                className="visitor-publish-btn"
+                onAuthenticatedClick={onGoToDashboard}
+              />
+            )}
           </div>
         </div>
       </header>

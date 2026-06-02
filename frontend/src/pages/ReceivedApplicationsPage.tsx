@@ -6,6 +6,9 @@ import {
   updateApplicationStatus,
 } from "../api/receivedApplicationsApi";
 import { useAuth0 } from "@auth0/auth0-react";
+import AvatarPlaceholder from "../components/AvatarPlaceholder";
+import { formatApplicationStatus } from "../utils/formatLabels";
+import { useToast } from "../components/Toast";
 
 type Props = {
   currentUser: CurrentUser | null;
@@ -33,11 +36,9 @@ export default function ReceivedApplicationsPage({
   currentUser,
 }: Props) {
   const { getAccessTokenSilently } = useAuth0();
+  const { showToast } = useToast();
   const [applications, setApplications] = useState<Application[]>([]);
-  const [selectedStudent, setSelectedStudent] =
-    useState<Application | null>(null);
-
-  const [activeTab, setActiveTab] = useState("pendiente");
+  const [activeTab, setActiveTab] = useState("todas");
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -46,7 +47,6 @@ export default function ReceivedApplicationsPage({
     const loadApplications = async () => {
       try {
         const token = await getAccessTokenSilently();
-
         const jobs = await getJobsByClient(currentUser._id, token);
 
         const applicationsByJob = await Promise.all(
@@ -64,9 +64,10 @@ export default function ReceivedApplicationsPage({
     loadApplications();
   }, [currentUser, getAccessTokenSilently]);
 
-  const filteredApplications = applications.filter(
-    (application) => application.status === activeTab
-  );
+  const filteredApplications =
+    activeTab === "todas"
+      ? applications
+      : applications.filter((application) => application.status === activeTab);
 
   const handleUpdateStatus = async (
     applicationId: string,
@@ -85,83 +86,62 @@ export default function ReceivedApplicationsPage({
         currentApplications.map((application) =>
           application._id === applicationId
             ? {
-              ...application,
-              status: updatedApplication.status,
-            }
+                ...application,
+                status: updatedApplication.status,
+              }
             : application
         )
       );
+      showToast("Estatus de postulación actualizado", "success");
     } catch (error) {
-      alert(
+      showToast(
         error instanceof Error
           ? error.message
-          : "Error al actualizar postulación"
+          : "Error al actualizar postulación",
+        "error"
       );
     }
   };
 
   if (isLoading) {
-    return <p>Cargando postulaciones...</p>;
-  }
-
-  if (selectedStudent) {
-    return (
-      <div>
-        <button
-          className="back-button"
-          onClick={() => setSelectedStudent(null)}
-        >
-          ← Volver a postulaciones
-        </button>
-
-        <div className="profile-card">
-          <div className="profile-header">
-            <div className="profile-avatar">👩‍💻</div>
-
-            <div>
-              <h3>{selectedStudent.student?.name}</h3>
-              <p>{selectedStudent.student?.email}</p>
-
-              <p>
-                <strong>Calificación:</strong> 4.5 / 5
-              </p>
-            </div>
-          </div>
-
-          <div className="profile-section">
-            <strong>Trabajo</strong>
-            <p>{selectedStudent.job?.title}</p>
-          </div>
-
-          <div className="profile-section">
-            <strong>Mensaje de postulación</strong>
-            <p>{selectedStudent.message}</p>
-          </div>
-        </div>
-      </div>
-    );
+    return <p className="profile-loading">Cargando postulaciones...</p>;
   }
 
   return (
-    <div>
-      <h2>Postulaciones</h2>
+    <div className="applications-page">
+      <header className="applications-page-header">
+        <span className="profile-eyebrow">Gestión de talento</span>
+        <h2>Postulaciones</h2>
+        <p>
+          Revisa las solicitudes de estudiantes y define su estatus: pendiente,
+          aceptada o rechazada.
+        </p>
+      </header>
 
       <div className="tabs">
         <button
+          type="button"
+          className={activeTab === "todas" ? "active" : ""}
+          onClick={() => setActiveTab("todas")}
+        >
+          Todas ({applications.length})
+        </button>
+        <button
+          type="button"
           className={activeTab === "pendiente" ? "active" : ""}
           onClick={() => setActiveTab("pendiente")}
         >
           Pendientes
         </button>
-
         <button
+          type="button"
           className={activeTab === "aceptada" ? "active" : ""}
           onClick={() => setActiveTab("aceptada")}
         >
           Aceptadas
         </button>
-
         <button
+          type="button"
           className={activeTab === "rechazada" ? "active" : ""}
           onClick={() => setActiveTab("rechazada")}
         >
@@ -169,51 +149,85 @@ export default function ReceivedApplicationsPage({
         </button>
       </div>
 
-      <div className="cards-grid">
-        {filteredApplications.map((application) => (
-          <article className="job-card" key={application._id}>
-            <h3>{application.student?.name}</h3>
+      {filteredApplications.length === 0 ? (
+        <div className="applications-empty">
+          <p>No hay postulaciones en esta categoría.</p>
+        </div>
+      ) : (
+        <div className="applications-list">
+          {filteredApplications.map((application) => (
+            <article className="application-card" key={application._id}>
+              <div className="application-card-header">
+                <div className="profile-avatar application-card-avatar">
+                  <AvatarPlaceholder name={application.student?.name} />
+                </div>
+                <div>
+                  <h3>{application.student?.name}</h3>
+                  <p>{application.student?.email}</p>
+                  <p className="application-card-job">
+                    Vacante: <strong>{application.job?.title}</strong>
+                  </p>
+                </div>
+                <span
+                  className={`status-badge status-badge--${application.status}`}
+                >
+                  {formatApplicationStatus(application.status)}
+                </span>
+              </div>
 
-            <p>
-              <strong>Trabajo:</strong> {application.job?.title}
-            </p>
+              <div className="application-card-message">
+                <strong>Mensaje del estudiante</strong>
+                <p>{application.message}</p>
+              </div>
 
-            <p>
-              <strong>Mensaje:</strong> {application.message}
-            </p>
-
-            <span className={`status-badge ${application.status}`}>
-              {application.status}
-            </span>
-
-            <div className="card-actions">
-              <button onClick={() => setSelectedStudent(application)}>
-                Ver perfil
-              </button>
-
-              {application.status === "pendiente" && (
-                <>
-                  <button
-                    onClick={() =>
-                      handleUpdateStatus(application._id, "aceptada")
-                    }
-                  >
-                    Aceptar
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      handleUpdateStatus(application._id, "rechazada")
-                    }
-                  >
-                    Rechazar
-                  </button>
-                </>
-              )}
-            </div>
-          </article>
-        ))}
-      </div>
+              <div className="application-status-actions">
+                <span className="application-status-label">
+                  Cambiar estatus:
+                </span>
+                <button
+                  type="button"
+                  className={
+                    application.status === "pendiente"
+                      ? "status-action-btn active"
+                      : "status-action-btn"
+                  }
+                  onClick={() =>
+                    handleUpdateStatus(application._id, "pendiente")
+                  }
+                >
+                  Pendiente
+                </button>
+                <button
+                  type="button"
+                  className={
+                    application.status === "aceptada"
+                      ? "status-action-btn active accepted"
+                      : "status-action-btn accepted"
+                  }
+                  onClick={() =>
+                    handleUpdateStatus(application._id, "aceptada")
+                  }
+                >
+                  Aceptada
+                </button>
+                <button
+                  type="button"
+                  className={
+                    application.status === "rechazada"
+                      ? "status-action-btn active rejected"
+                      : "status-action-btn rejected"
+                  }
+                  onClick={() =>
+                    handleUpdateStatus(application._id, "rechazada")
+                  }
+                >
+                  Rechazada
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

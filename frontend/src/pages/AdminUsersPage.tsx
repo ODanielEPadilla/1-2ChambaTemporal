@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getUsers, updateUserStatus, updateUserRole } from "../api/adminApi";
 import { getProfileByUserId } from "../api/profileApi";
 import { useAuth0 } from "@auth0/auth0-react";
+import AvatarPlaceholder from "../components/AvatarPlaceholder";
 
 type User = {
   _id: string;
@@ -107,15 +108,12 @@ export default function AdminUsersPage() {
         <div className="profile-card">
           <div className="profile-header">
             <div className="profile-avatar">
-              {selectedProfile.imageUrl ? (
-                <img
-                  src={selectedProfile.imageUrl}
-                  alt="Foto de perfil"
-                  className="profile-avatar-image"
-                />
-              ) : (
-                "👤"
-              )}
+              <AvatarPlaceholder
+                name={selectedProfile.user?.name}
+                imageUrl={selectedProfile.imageUrl}
+                alt="Foto de perfil"
+                className="profile-avatar-image"
+              />
             </div>
 
             <div>

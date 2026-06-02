@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
 import { useNavigate } from "react-router-dom";
 import DashboardLayout from "./layouts/DashboardLayout";
@@ -9,6 +9,8 @@ import AccountBlockedScreen from "./components/AccountBlockedScreen";
 import { PENDING_APPLY_KEY } from "./components/JobBoard";
 import { createCurrentUser } from "./api/userApi";
 import { REGISTER_INTENT_KEY } from "./components/LoginButton";
+import BrandLogo from "./components/BrandLogo";
+import { bootstrapCompanyAccount } from "./utils/companyBootstrap";
 
 export type CurrentUser = {
   _id: string;
@@ -22,12 +24,11 @@ export type CurrentUser = {
 
 export type PortalView = "visitor" | "dashboard";
 
+function isDashboardBlocked(user: CurrentUser) {
+  return user.status in BLOCKED_MESSAGES;
+}
+
 const BLOCKED_MESSAGES: Record<string, { title: string; message: string }> = {
-  pendiente: {
-    title: "Cuenta en revisión",
-    message:
-      "Tu cuenta de empresa o cliente está pendiente de aprobación por el administrador.",
-  },
   suspendido: {
     title: "Cuenta suspendida",
     message: "Tu cuenta fue suspendida. No puedes acceder al sistema.",
@@ -39,7 +40,8 @@ const BLOCKED_MESSAGES: Record<string, { title: string; message: string }> = {
 };
 
 function App() {
-  const { isAuthenticated, isLoading, loginWithRedirect, user } = useAuth0();
+  const { isAuthenticated, isLoading, loginWithRedirect, user, getAccessTokenSilently } =
+    useAuth0();
   const navigate = useNavigate();
   const [portalView, setPortalView] = useState<PortalView>("visitor");
   const [selectedView, setSelectedView] = useState("home");
@@ -49,6 +51,10 @@ function App() {
   const [pendingApplyJobId, setPendingApplyJobId] = useState<string | null>(
     () => sessionStorage.getItem(PENDING_APPLY_KEY)
   );
+  const [openPublishForm, setOpenPublishForm] = useState(false);
+  const [isBootstrappingCompany, setIsBootstrappingCompany] = useState(false);
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null);
+  const companyBootstrapStarted = useRef(false);
 
   const syncUser = useCallback(async () => {
     if (!isAuthenticated || !user?.sub) return;
@@ -111,6 +117,60 @@ function App() {
     }
   }, [isAuthenticated, user, currentUser, isSyncingUser, syncError, syncUser]);
 
+  const publishIntent =
+    sessionStorage.getItem(REGISTER_INTENT_KEY) === "cliente";
+
+  useEffect(() => {
+    if (!isAuthenticated || !currentUser) return;
+    if (currentUser.onboardingCompleted || !publishIntent) return;
+    if (companyBootstrapStarted.current) return;
+
+    companyBootstrapStarted.current = true;
+    let cancelled = false;
+
+    const runBootstrap = async () => {
+      setIsBootstrappingCompany(true);
+      setBootstrapError(null);
+
+      try {
+        const token = await getAccessTokenSilently();
+        const updated = await bootstrapCompanyAccount(currentUser, token);
+
+        if (cancelled) return;
+
+        sessionStorage.removeItem(REGISTER_INTENT_KEY);
+        setCurrentUser(updated);
+        setPortalView("dashboard");
+        setSelectedView("misTrabajos");
+        setOpenPublishForm(true);
+      } catch (error) {
+        if (!cancelled) {
+          companyBootstrapStarted.current = false;
+          setBootstrapError(
+            error instanceof Error
+              ? error.message
+              : "No se pudo preparar tu cuenta de empresa."
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setIsBootstrappingCompany(false);
+        }
+      }
+    };
+
+    runBootstrap();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    isAuthenticated,
+    currentUser,
+    publishIntent,
+    getAccessTokenSilently,
+  ]);
+
   const handleRequireLogin = () => {
     loginWithRedirect({
       appState: { returnTo: window.location.pathname },
@@ -130,10 +190,13 @@ function App() {
 
     if (!currentUser.onboardingCompleted) {
       setPortalView("dashboard");
+      if (sessionStorage.getItem(REGISTER_INTENT_KEY) === "cliente") {
+        setSelectedView("misTrabajos");
+      }
       return;
     }
 
-    if (BLOCKED_MESSAGES[currentUser.status]) {
+    if (isDashboardBlocked(currentUser)) {
       setPortalView("dashboard");
       return;
     }
@@ -174,6 +237,7 @@ function App() {
     return (
       <VisitorLayout>
         <div className="home-card" style={{ margin: "40px auto", maxWidth: 480 }}>
+          <BrandLogo size="lg" className="home-logo" />
           <h1>Error de sesión</h1>
           <p>{syncError}</p>
           <button className="primary-button" onClick={syncUser}>
@@ -189,6 +253,38 @@ function App() {
   }
 
   if (!currentUser.onboardingCompleted) {
+    if (publishIntent || isBootstrappingCompany) {
+      if (bootstrapError) {
+        return (
+          <VisitorLayout>
+            <div
+              className="home-card"
+              style={{ margin: "40px auto", maxWidth: 480 }}
+            >
+              <BrandLogo size="lg" className="home-logo" />
+              <h1>Error al publicar empleo</h1>
+              <p>{bootstrapError}</p>
+              <button
+                className="primary-button"
+                onClick={() => {
+                  companyBootstrapStarted.current = false;
+                  setBootstrapError(null);
+                }}
+              >
+                Reintentar
+              </button>
+            </div>
+          </VisitorLayout>
+        );
+      }
+
+      return (
+        <p className="loading-screen">
+          Preparando formulario de publicación...
+        </p>
+      );
+    }
+
     return (
       <OnboardingPage
         currentUser={currentUser}
@@ -196,15 +292,10 @@ function App() {
           sessionStorage.removeItem(REGISTER_INTENT_KEY);
           setCurrentUser(updated);
 
-          if (updated.role === "cliente") {
-            setPortalView("dashboard");
-            setSelectedView("misTrabajos");
-          } else {
-            const pending = sessionStorage.getItem(PENDING_APPLY_KEY);
-            setPortalView(pending ? "visitor" : "dashboard");
-            setSelectedView("postulaciones");
-            if (pending) navigate("/empleos");
-          }
+          const pending = sessionStorage.getItem(PENDING_APPLY_KEY);
+          setPortalView(pending ? "visitor" : "dashboard");
+          setSelectedView("postulaciones");
+          if (pending) navigate("/empleos");
         }}
       />
     );
@@ -214,7 +305,7 @@ function App() {
     return renderVisitorPortal();
   }
 
-  if (BLOCKED_MESSAGES[currentUser.status]) {
+  if (isDashboardBlocked(currentUser)) {
     const blocked = BLOCKED_MESSAGES[currentUser.status];
 
     return (
@@ -229,6 +320,8 @@ function App() {
       selectedView={selectedView}
       setSelectedView={setSelectedView}
       currentUser={currentUser}
+      openPublishForm={openPublishForm}
+      onPublishFormOpened={() => setOpenPublishForm(false)}
       onOpenJobBoard={() => {
         setPortalView("visitor");
         navigate("/empleos");

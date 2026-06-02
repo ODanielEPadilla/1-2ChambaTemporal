@@ -4,9 +4,13 @@ import { createJob, getJobsByClient, updateJob, finishJob } from "../api/myJobAp
 import { getApplicationsByJob, updateApplicationStatus } from "../api/receivedApplicationsApi";
 import { createRating } from "../api/createRatingApi";
 import { useAuth0 } from "@auth0/auth0-react";
+import { formatApplicationStatus } from "../utils/formatLabels";
+import { useToast } from "../components/Toast";
 
 type Props = {
   currentUser: CurrentUser | null;
+  initialShowForm?: boolean;
+  onFormOpened?: () => void;
 };
 
 type Job = {
@@ -19,8 +23,12 @@ type Job = {
   status: string;
 };
 
-export default function MyJobsPage({ currentUser }: Props) {
-  const [showForm, setShowForm] = useState(false);
+export default function MyJobsPage({
+  currentUser,
+  initialShowForm = false,
+  onFormOpened,
+}: Props) {
+  const [showForm, setShowForm] = useState(initialShowForm);
   const [editingJobId, setEditingJobId] = useState("");
   const [jobs, setJobs] = useState<Job[]>([]);
   const [selectedJobApplications, setSelectedJobApplications] = useState<any[]>([]);
@@ -40,6 +48,13 @@ export default function MyJobsPage({ currentUser }: Props) {
   const [score, setScore] = useState(5);
   const [comment, setComment] = useState("");
   const { getAccessTokenSilently } = useAuth0();
+  const { showToast } = useToast();
+
+  useEffect(() => {
+    if (!initialShowForm) return;
+    setShowForm(true);
+    onFormOpened?.();
+  }, [initialShowForm, onFormOpened]);
 
   useEffect(() => {
     if (!currentUser?._id) return;
@@ -89,7 +104,7 @@ export default function MyJobsPage({ currentUser }: Props) {
 
       setJobs((currentJobs) => [...currentJobs, newJob]);
 
-      alert("Trabajo publicado correctamente");
+      showToast("Trabajo publicado correctamente", "success");
 
       setTitle("");
       setDescription("");
@@ -104,7 +119,10 @@ export default function MyJobsPage({ currentUser }: Props) {
       setEditingJobId("");
       setShowForm(false);
     } catch (error) {
-      alert(error instanceof Error ? error.message : "Error al publicar trabajo");
+      showToast(
+        error instanceof Error ? error.message : "Error al publicar trabajo",
+        "error"
+      );
     }
   };
 
@@ -162,7 +180,7 @@ export default function MyJobsPage({ currentUser }: Props) {
         )
       );
 
-      alert("Trabajo actualizado correctamente");
+      showToast("Trabajo actualizado correctamente", "success");
 
       setEditingJobId("");
       setTitle("");
@@ -172,8 +190,9 @@ export default function MyJobsPage({ currentUser }: Props) {
       setEstimatedDuration("");
       setShowForm(false);
     } catch (error) {
-      alert(
-        error instanceof Error ? error.message : "Error al actualizar trabajo"
+      showToast(
+        error instanceof Error ? error.message : "Error al actualizar trabajo",
+        "error"
       );
     }
   };
@@ -190,12 +209,13 @@ export default function MyJobsPage({ currentUser }: Props) {
         )
       );
 
-      alert("Trabajo finalizado correctamente");
+      showToast("Trabajo finalizado correctamente", "success");
     } catch (error) {
-      alert(
+      showToast(
         error instanceof Error
           ? error.message
-          : "Error al finalizar trabajo"
+          : "Error al finalizar trabajo",
+        "error"
       );
     }
   };
@@ -217,16 +237,17 @@ export default function MyJobsPage({ currentUser }: Props) {
         token
       );
 
-      alert("Calificación guardada correctamente");
+      showToast("Calificación guardada correctamente", "success");
 
       setRatingApplication(null);
       setScore(5);
       setComment("");
     } catch (error) {
-      alert(
+      showToast(
         error instanceof Error
           ? error.message
-          : "Error al guardar calificación"
+          : "Error al guardar calificación",
+        "error"
       );
     }
   };
@@ -240,10 +261,11 @@ export default function MyJobsPage({ currentUser }: Props) {
       setSelectedJobApplications(data);
       setSelectedJobTitle(jobTitle);
     } catch (error) {
-      alert(
+      showToast(
         error instanceof Error
           ? error.message
-          : "Error al obtener postulaciones"
+          : "Error al obtener postulaciones",
+        "error"
       );
     }
   };
@@ -271,11 +293,13 @@ export default function MyJobsPage({ currentUser }: Props) {
             : application
         )
       );
+      showToast("Estatus de postulación actualizado", "success");
     } catch (error) {
-      alert(
+      showToast(
         error instanceof Error
           ? error.message
-          : "Error al actualizar postulación"
+          : "Error al actualizar postulación",
+        "error"
       );
     }
   };
@@ -332,118 +356,164 @@ export default function MyJobsPage({ currentUser }: Props) {
 
   if (showForm) {
     return (
-      <div>
+      <div className="publish-job-page">
         <button className="back-button" onClick={() => setShowForm(false)}>
-          ← Volver a mis trabajos
+          Volver a mis trabajos
         </button>
 
-        <div className="detail-card">
+        <header className="publish-job-header">
+          <span className="profile-eyebrow">Bolsa de empleo</span>
           <h2>
-            {editingJobId
-              ? "Editar trabajo"
-              : "Publicar nuevo trabajo"}
+            {editingJobId ? "Editar vacante" : "Registrar nueva vacante"}
           </h2>
+          <p>
+            Completa la información del puesto. Los estudiantes ISC podrán verla
+            en la bolsa pública de 1/2Chamba.
+          </p>
+        </header>
 
-          <label className="form-label">Título</label>
-          <input
-            className="form-input"
-            placeholder="Ej. Página web para negocio"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
+        <div className="publish-job-card">
+          <section className="publish-job-section">
+            <h3>Información general</h3>
+            <div className="publish-job-grid">
+              <div className="publish-job-field publish-job-field--full">
+                <label className="form-label">Título del puesto</label>
+                <input
+                  className="form-input"
+                  placeholder="Ej. Desarrollador web para PYME"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                />
+              </div>
 
-          <label className="form-label">Descripción</label>
-          <textarea
-            className="form-textarea"
-            placeholder="Describe el trabajo..."
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
+              <div className="publish-job-field publish-job-field--full">
+                <label className="form-label">Descripción del trabajo</label>
+                <textarea
+                  className="form-textarea"
+                  placeholder="Actividades, requisitos y entregables esperados..."
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </div>
 
-          <label className="form-label">Categoría</label>
-          <select
-            className="form-input"
-            value={category}
-            onChange={(e) => setCategory(e.target.value)}
-          >
-            <option value="desarrollo web">Desarrollo web</option>
-            <option value="soporte tecnico">Soporte técnico</option>
-            <option value="base de datos">Base de datos</option>
-            <option value="diseño de interfaces">Diseño de interfaces</option>
-            <option value="otro">Otro</option>
-          </select>
+              <div className="publish-job-field">
+                <label className="form-label">Categoría</label>
+                <select
+                  className="form-input"
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value)}
+                >
+                  <option value="desarrollo web">Desarrollo web</option>
+                  <option value="soporte tecnico">Soporte técnico</option>
+                  <option value="base de datos">Base de datos</option>
+                  <option value="diseño de interfaces">Diseño de interfaces</option>
+                  <option value="otro">Otro</option>
+                </select>
+              </div>
 
-          <label className="form-label">Modalidad</label>
-          <select
-            className="form-input"
-            value={modality}
-            onChange={(e) => setModality(e.target.value)}
-          >
-            <option value="remoto">Remoto</option>
-            <option value="presencial">Presencial</option>
-            <option value="hibrido">Híbrido</option>
-          </select>
+              <div className="publish-job-field">
+                <label className="form-label">Modalidad</label>
+                <select
+                  className="form-input"
+                  value={modality}
+                  onChange={(e) => setModality(e.target.value)}
+                >
+                  <option value="remoto">Remoto</option>
+                  <option value="presencial">Presencial</option>
+                  <option value="hibrido">Híbrido</option>
+                </select>
+              </div>
+            </div>
+          </section>
 
-          <label className="form-label">Duración estimada</label>
-          <input
-            className="form-input"
-            placeholder="Ej. 2 semanas"
-            value={estimatedDuration}
-            onChange={(e) => setEstimatedDuration(e.target.value)}
-          />
+          <section className="publish-job-section">
+            <h3>Ubicación y compensación</h3>
+            <div className="publish-job-grid">
+              <div className="publish-job-field">
+                <label className="form-label">Duración estimada</label>
+                <input
+                  className="form-input"
+                  placeholder="Ej. 2 meses, medio tiempo"
+                  value={estimatedDuration}
+                  onChange={(e) => setEstimatedDuration(e.target.value)}
+                />
+              </div>
 
-          <label className="form-label">Ubicación</label>
-          <input
-            className="form-input"
-            placeholder="Ej. Zacatecas, Zac."
-            value={location}
-            onChange={(e) => setLocation(e.target.value)}
-          />
+              <div className="publish-job-field">
+                <label className="form-label">Vacantes</label>
+                <input
+                  className="form-input"
+                  type="number"
+                  min={1}
+                  value={vacancies}
+                  onChange={(e) => setVacancies(Number(e.target.value))}
+                />
+              </div>
 
-          <label className="form-label">Ciudad</label>
-          <input
-            className="form-input"
-            value={city}
-            onChange={(e) => setCity(e.target.value)}
-          />
+              <div className="publish-job-field">
+                <label className="form-label">Ubicación</label>
+                <input
+                  className="form-input"
+                  placeholder="Ej. Zacatecas, Zac."
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                />
+              </div>
 
-          <label className="form-label">Compensación</label>
-          <input
-            className="form-input"
-            placeholder="Ej. $3,500 / mes o A convenir"
-            value={compensation}
-            onChange={(e) => setCompensation(e.target.value)}
-          />
+              <div className="publish-job-field">
+                <label className="form-label">Ciudad</label>
+                <input
+                  className="form-input"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                />
+              </div>
 
-          <label className="form-label">Habilidades requeridas (separadas por coma)</label>
-          <input
-            className="form-input"
-            placeholder="React, Node.js, MongoDB"
-            value={skillsRequired}
-            onChange={(e) => setSkillsRequired(e.target.value)}
-          />
+              <div className="publish-job-field publish-job-field--full">
+                <label className="form-label">Compensación</label>
+                <input
+                  className="form-input"
+                  placeholder="Ej. $3,500 / mes o A convenir"
+                  value={compensation}
+                  onChange={(e) => setCompensation(e.target.value)}
+                />
+              </div>
+            </div>
+          </section>
 
-          <label className="form-label">Vacantes</label>
-          <input
-            className="form-input"
-            type="number"
-            min={1}
-            value={vacancies}
-            onChange={(e) => setVacancies(Number(e.target.value))}
-          />
+          <section className="publish-job-section">
+            <h3>Perfil buscado</h3>
+            <div className="publish-job-grid">
+              <div className="publish-job-field publish-job-field--full">
+                <label className="form-label">
+                  Habilidades requeridas (separadas por coma)
+                </label>
+                <input
+                  className="form-input"
+                  placeholder="React, Node.js, MongoDB, Git"
+                  value={skillsRequired}
+                  onChange={(e) => setSkillsRequired(e.target.value)}
+                />
+              </div>
+            </div>
+          </section>
 
-          <button
-            className="primary-button form-submit"
-            onClick={
-              editingJobId
-                ? handleUpdateJob
-                : handleCreateJob
-            }
-          >
-            {editingJobId
-              ? "Guardar cambios"
-              : "Publicar trabajo"}
-          </button>
+          <div className="publish-job-actions">
+            <button
+              type="button"
+              className="secondary-button"
+              onClick={() => setShowForm(false)}
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              className="primary-button"
+              onClick={editingJobId ? handleUpdateJob : handleCreateJob}
+            >
+              {editingJobId ? "Guardar cambios" : "Publicar vacante"}
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -476,29 +546,56 @@ export default function MyJobsPage({ currentUser }: Props) {
                 {application.message}
               </p>
 
-              <span className={`status-badge ${application.status}`}>
-                {application.status}
+              <span
+                className={`status-badge status-badge--${application.status}`}
+              >
+                {formatApplicationStatus(application.status)}
               </span>
 
-              {application.status === "pendiente" && (
-                <div className="card-actions">
-                  <button
-                    onClick={() =>
-                      handleUpdateApplicationStatus(application._id, "aceptada")
-                    }
-                  >
-                    Aceptar
-                  </button>
-
-                  <button
-                    onClick={() =>
-                      handleUpdateApplicationStatus(application._id, "rechazada")
-                    }
-                  >
-                    Rechazar
-                  </button>
-                </div>
-              )}
+              <div className="application-status-actions">
+                <button
+                  type="button"
+                  className={
+                    application.status === "pendiente"
+                      ? "status-action-btn active"
+                      : "status-action-btn"
+                  }
+                  onClick={() =>
+                    handleUpdateApplicationStatus(
+                      application._id,
+                      "pendiente"
+                    )
+                  }
+                >
+                  Pendiente
+                </button>
+                <button
+                  type="button"
+                  className={
+                    application.status === "aceptada"
+                      ? "status-action-btn active accepted"
+                      : "status-action-btn accepted"
+                  }
+                  onClick={() =>
+                    handleUpdateApplicationStatus(application._id, "aceptada")
+                  }
+                >
+                  Aceptada
+                </button>
+                <button
+                  type="button"
+                  className={
+                    application.status === "rechazada"
+                      ? "status-action-btn active rejected"
+                      : "status-action-btn rejected"
+                  }
+                  onClick={() =>
+                    handleUpdateApplicationStatus(application._id, "rechazada")
+                  }
+                >
+                  Rechazada
+                </button>
+              </div>
 
               {application.status === "aceptada" && (
                 <div className="card-actions">

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { getAllRatings } from "../api/adminApi";
 import { useAuth0 } from "@auth0/auth0-react";
+import AvatarPlaceholder from "../components/AvatarPlaceholder";
 
 type Rating = {
   _id: string;
@@ -52,7 +53,9 @@ export default function AdminRatingsPage() {
       <div className="ratings-list">
         {ratings.map((rating) => (
           <article className="rating-card" key={rating._id}>
-            <div className="rating-avatar">⭐</div>
+            <div className="rating-avatar">
+              <AvatarPlaceholder name={rating.reviewer?.name} />
+            </div>
 
             <div>
               <h3>{rating.score} / 5</h3>
