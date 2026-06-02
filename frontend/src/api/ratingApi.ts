@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:3000";
+import { API_BASE_URL } from "../config/api";
 
 export const getRatingsByUser = async (userId: string, token: string) => {
   const response = await fetch(`${API_BASE_URL}/api/rating/user/${userId}`, {

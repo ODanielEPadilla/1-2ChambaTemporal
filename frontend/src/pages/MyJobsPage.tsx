@@ -31,6 +31,11 @@ export default function MyJobsPage({ currentUser }: Props) {
   const [category, setCategory] = useState("desarrollo web");
   const [modality, setModality] = useState("remoto");
   const [estimatedDuration, setEstimatedDuration] = useState("");
+  const [location, setLocation] = useState("Zacatecas, Zac.");
+  const [city, setCity] = useState("Zacatecas");
+  const [compensation, setCompensation] = useState("A convenir");
+  const [skillsRequired, setSkillsRequired] = useState("");
+  const [vacancies, setVacancies] = useState(1);
   const [ratingApplication, setRatingApplication] = useState<any | null>(null);
   const [score, setScore] = useState(5);
   const [comment, setComment] = useState("");
@@ -70,6 +75,14 @@ export default function MyJobsPage({ currentUser }: Props) {
           category,
           modality,
           estimatedDuration,
+          location,
+          city,
+          compensation,
+          skillsRequired: skillsRequired
+            .split(",")
+            .map((skill) => skill.trim())
+            .filter(Boolean),
+          vacancies,
         },
         token
       );
@@ -83,6 +96,11 @@ export default function MyJobsPage({ currentUser }: Props) {
       setCategory("desarrollo web");
       setModality("remoto");
       setEstimatedDuration("");
+      setLocation("Zacatecas, Zac.");
+      setCity("Zacatecas");
+      setCompensation("A convenir");
+      setSkillsRequired("");
+      setVacancies(1);
       setEditingJobId("");
       setShowForm(false);
     } catch (error) {
@@ -98,6 +116,17 @@ export default function MyJobsPage({ currentUser }: Props) {
     setCategory(job.category);
     setModality(job.modality);
     setEstimatedDuration(job.estimatedDuration);
+    setLocation((job as Job & { location?: string }).location || "Zacatecas, Zac.");
+    setCity((job as Job & { city?: string }).city || "Zacatecas");
+    setCompensation(
+      (job as Job & { compensation?: string }).compensation || "A convenir"
+    );
+    setSkillsRequired(
+      ((job as Job & { skillsRequired?: string[] }).skillsRequired || []).join(
+        ", "
+      )
+    );
+    setVacancies((job as Job & { vacancies?: number }).vacancies || 1);
 
     setShowForm(true);
   };
@@ -115,6 +144,14 @@ export default function MyJobsPage({ currentUser }: Props) {
           modality,
           estimatedDuration,
           status: "abierto",
+          location,
+          city,
+          compensation,
+          skillsRequired: skillsRequired
+            .split(",")
+            .map((skill) => skill.trim())
+            .filter(Boolean),
+          vacancies,
         },
         token
       );
@@ -353,6 +390,46 @@ export default function MyJobsPage({ currentUser }: Props) {
             placeholder="Ej. 2 semanas"
             value={estimatedDuration}
             onChange={(e) => setEstimatedDuration(e.target.value)}
+          />
+
+          <label className="form-label">Ubicación</label>
+          <input
+            className="form-input"
+            placeholder="Ej. Zacatecas, Zac."
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+          />
+
+          <label className="form-label">Ciudad</label>
+          <input
+            className="form-input"
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+          />
+
+          <label className="form-label">Compensación</label>
+          <input
+            className="form-input"
+            placeholder="Ej. $3,500 / mes o A convenir"
+            value={compensation}
+            onChange={(e) => setCompensation(e.target.value)}
+          />
+
+          <label className="form-label">Habilidades requeridas (separadas por coma)</label>
+          <input
+            className="form-input"
+            placeholder="React, Node.js, MongoDB"
+            value={skillsRequired}
+            onChange={(e) => setSkillsRequired(e.target.value)}
+          />
+
+          <label className="form-label">Vacantes</label>
+          <input
+            className="form-input"
+            type="number"
+            min={1}
+            value={vacancies}
+            onChange={(e) => setVacancies(Number(e.target.value))}
           />
 
           <button

@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:3000";
+import { API_BASE_URL } from "../config/api";
 
 export const getProfileByUserId = async (userId: string, token: string) => {
   const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`, {
@@ -22,6 +22,7 @@ type UpdateProfileRequest = {
   companyName?: string;
   rfc?: string;
   imageFile?: File | null;
+  verificationFile?: File | null;
 };
 
 export const updateProfile = async (
@@ -46,6 +47,10 @@ export const updateProfile = async (
 
   if (profile.imageFile) {
     formData.append("imageFile", profile.imageFile);
+  }
+
+  if (profile.verificationFile) {
+    formData.append("verificationFile", profile.verificationFile);
   }
 
   const response = await fetch(`${API_BASE_URL}/api/profile/${userId}`, {

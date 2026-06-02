@@ -1,9 +1,14 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth0 } from "@auth0/auth0-react";
+import { useNavigate } from "react-router-dom";
 import DashboardLayout from "./layouts/DashboardLayout";
-import HomePage from "./pages/HomePage";
+import VisitorLayout from "./layouts/VisitorLayout";
+import VisitorPortal from "./layouts/VisitorPortal";
 import OnboardingPage from "./pages/OnboardingPage";
+import AccountBlockedScreen from "./components/AccountBlockedScreen";
+import { PENDING_APPLY_KEY } from "./components/JobBoard";
 import { createCurrentUser } from "./api/userApi";
+import { REGISTER_INTENT_KEY } from "./components/LoginButton";
 
 export type CurrentUser = {
   _id: string;
@@ -15,59 +20,207 @@ export type CurrentUser = {
   onboardingCompleted: boolean;
 };
 
+export type PortalView = "visitor" | "dashboard";
+
+const BLOCKED_MESSAGES: Record<string, { title: string; message: string }> = {
+  pendiente: {
+    title: "Cuenta en revisión",
+    message:
+      "Tu cuenta de empresa o cliente está pendiente de aprobación por el administrador.",
+  },
+  suspendido: {
+    title: "Cuenta suspendida",
+    message: "Tu cuenta fue suspendida. No puedes acceder al sistema.",
+  },
+  rechazado: {
+    title: "Cuenta rechazada",
+    message: "Tu solicitud de registro fue rechazada.",
+  },
+};
+
 function App() {
-  const { isAuthenticated, isLoading, user } = useAuth0();
+  const { isAuthenticated, isLoading, loginWithRedirect, user } = useAuth0();
+  const navigate = useNavigate();
+  const [portalView, setPortalView] = useState<PortalView>("visitor");
   const [selectedView, setSelectedView] = useState("home");
   const [currentUser, setCurrentUser] = useState<CurrentUser | null>(null);
+  const [isSyncingUser, setIsSyncingUser] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
+  const [pendingApplyJobId, setPendingApplyJobId] = useState<string | null>(
+    () => sessionStorage.getItem(PENDING_APPLY_KEY)
+  );
 
-  useEffect(() => { 
-    if (isAuthenticated && user?.sub && user?.email) {
-      createCurrentUser({
-        auth0Id: user.sub,
-        email: user.email,
-        name: user.name || "Usuario",
-        role: "estudiante",
-      })
-        .then((mongoUser) => {
-          setCurrentUser(mongoUser);
-        })
-        .catch((error) => {
-          console.log(error);
-        });
+  const syncUser = useCallback(async () => {
+    if (!isAuthenticated || !user?.sub) return;
+
+    const email = user.email;
+
+    if (!email) {
+      setSyncError("No se pudo obtener tu correo desde Auth0.");
+      return;
     }
-  }, [isAuthenticated, user]);
 
-  if (isLoading || (isAuthenticated && !currentUser)) {
-    return <p>Cargando...</p>;
+    setIsSyncingUser(true);
+    setSyncError(null);
+
+    try {
+      const mongoUser = await createCurrentUser({
+        auth0Id: user.sub,
+        email,
+        name: user.name || user.nickname || "Usuario",
+        role: "estudiante",
+      });
+
+      setCurrentUser(mongoUser);
+
+      const registerIntent = sessionStorage.getItem(REGISTER_INTENT_KEY);
+
+      if (registerIntent === "cliente" && !mongoUser.onboardingCompleted) {
+        setPortalView("dashboard");
+      }
+
+      const pendingJob = sessionStorage.getItem(PENDING_APPLY_KEY);
+
+      if (pendingJob) {
+        setPendingApplyJobId(pendingJob);
+        setPortalView("visitor");
+        navigate("/empleos");
+      }
+    } catch (error) {
+      setSyncError(
+        error instanceof Error
+          ? error.message
+          : "No se pudo conectar con el servidor (puerto 3001)."
+      );
+      setCurrentUser(null);
+    } finally {
+      setIsSyncingUser(false);
+    }
+  }, [isAuthenticated, user, navigate]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setCurrentUser(null);
+      setSyncError(null);
+      setPortalView("visitor");
+      return;
+    }
+
+    if (user?.sub && !currentUser && !isSyncingUser && !syncError) {
+      syncUser();
+    }
+  }, [isAuthenticated, user, currentUser, isSyncingUser, syncError, syncUser]);
+
+  const handleRequireLogin = () => {
+    loginWithRedirect({
+      appState: { returnTo: window.location.pathname },
+    });
+  };
+
+  const handlePendingApplyHandled = () => {
+    sessionStorage.removeItem(PENDING_APPLY_KEY);
+    setPendingApplyJobId(null);
+  };
+
+  const openDashboard = () => {
+    if (!currentUser) {
+      handleRequireLogin();
+      return;
+    }
+
+    if (!currentUser.onboardingCompleted) {
+      setPortalView("dashboard");
+      return;
+    }
+
+    if (BLOCKED_MESSAGES[currentUser.status]) {
+      setPortalView("dashboard");
+      return;
+    }
+
+    setPortalView("dashboard");
+    setSelectedView(
+      currentUser.role === "cliente"
+        ? "misTrabajos"
+        : currentUser.role === "administrador"
+          ? "usuarios"
+          : "postulaciones"
+    );
+  };
+
+  const renderVisitorPortal = () => (
+    <VisitorPortal
+      currentUser={currentUser}
+      pendingApplyJobId={pendingApplyJobId}
+      onPendingApplyHandled={handlePendingApplyHandled}
+      onRequireLogin={handleRequireLogin}
+      onGoToDashboard={openDashboard}
+    />
+  );
+
+  if (isLoading) {
+    return <p className="loading-screen">Cargando...</p>;
   }
 
   if (!isAuthenticated) {
-    return <HomePage />;
+    return renderVisitorPortal();
   }
 
-  if (currentUser && !currentUser.onboardingCompleted) {
+  if (isSyncingUser) {
+    return <p className="loading-screen">Cargando tu cuenta...</p>;
+  }
+
+  if (syncError) {
+    return (
+      <VisitorLayout>
+        <div className="home-card" style={{ margin: "40px auto", maxWidth: 480 }}>
+          <h1>Error de sesión</h1>
+          <p>{syncError}</p>
+          <button className="primary-button" onClick={syncUser}>
+            Reintentar
+          </button>
+        </div>
+      </VisitorLayout>
+    );
+  }
+
+  if (!currentUser) {
+    return <p className="loading-screen">Preparando tu cuenta...</p>;
+  }
+
+  if (!currentUser.onboardingCompleted) {
     return (
       <OnboardingPage
         currentUser={currentUser}
-        onFinish={setCurrentUser}
+        onFinish={(updated) => {
+          sessionStorage.removeItem(REGISTER_INTENT_KEY);
+          setCurrentUser(updated);
+
+          if (updated.role === "cliente") {
+            setPortalView("dashboard");
+            setSelectedView("misTrabajos");
+          } else {
+            const pending = sessionStorage.getItem(PENDING_APPLY_KEY);
+            setPortalView(pending ? "visitor" : "dashboard");
+            setSelectedView("postulaciones");
+            if (pending) navigate("/empleos");
+          }
+        }}
       />
     );
   }
 
-  if (currentUser && currentUser.status === "suspendido") {
+  if (portalView === "visitor") {
+    return renderVisitorPortal();
+  }
+
+  if (BLOCKED_MESSAGES[currentUser.status]) {
+    const blocked = BLOCKED_MESSAGES[currentUser.status];
+
     return (
-      <div className="home-page">
-        <div className="home-card">
-          <div className="logo home-logo">½</div>
-
-          <h1>Cuenta suspendida</h1>
-
-          <p>
-            Tu cuenta fue suspendida por el administrador. No puedes acceder al
-            sistema por el momento.
-          </p>
-        </div>
-      </div>
+      <VisitorLayout currentUser={currentUser} onGoToDashboard={openDashboard}>
+        <AccountBlockedScreen title={blocked.title} message={blocked.message} />
+      </VisitorLayout>
     );
   }
 
@@ -76,6 +229,14 @@ function App() {
       selectedView={selectedView}
       setSelectedView={setSelectedView}
       currentUser={currentUser}
+      onOpenJobBoard={() => {
+        setPortalView("visitor");
+        navigate("/empleos");
+      }}
+      onExitDashboard={() => {
+        setPortalView("visitor");
+        navigate("/");
+      }}
     />
   );
 }

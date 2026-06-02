@@ -106,7 +106,17 @@ export default function AdminUsersPage() {
 
         <div className="profile-card">
           <div className="profile-header">
-            <div className="profile-avatar">👤</div>
+            <div className="profile-avatar">
+              {selectedProfile.imageUrl ? (
+                <img
+                  src={selectedProfile.imageUrl}
+                  alt="Foto de perfil"
+                  className="profile-avatar-image"
+                />
+              ) : (
+                "👤"
+              )}
+            </div>
 
             <div>
               <h3>{selectedProfile.user?.name}</h3>

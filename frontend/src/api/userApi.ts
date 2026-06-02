@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:3000";
+import { API_BASE_URL } from "../config/api";
 
 type CreateUserRequest = {
   auth0Id: string;
@@ -28,7 +28,8 @@ export const createCurrentUser = async (user: CreateUserRequest) => {
 export const updateUserRole = async (
   userId: string,
   role: string,
-  token: string
+  token: string,
+  controlNumber?: string
 ) => {
   const response = await fetch(`${API_BASE_URL}/api/user/${userId}/role`, {
     method: "PUT",
@@ -36,7 +37,7 @@ export const updateUserRole = async (
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ role }),
+    body: JSON.stringify({ role, controlNumber }),
   });
 
   const data = await response.json();

@@ -201,7 +201,11 @@ export default function ProfilePage({ currentUser }: Props) {
 
           <div>
             <strong>Calificación</strong>
-            <p>{profile.averageRating || 4.5} / 5</p>
+            <p>
+              {profile.averageRating > 0
+                ? `${profile.averageRating} / 5`
+                : "Sin calificaciones"}
+            </p>
           </div>
         </div>
 

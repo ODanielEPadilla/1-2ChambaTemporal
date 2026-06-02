@@ -1,7 +1,27 @@
-const API_BASE_URL = "http://localhost:3000";
+import { API_BASE_URL } from "../config/api";
 
-export const getJobs = async (token: string) => {
-  const response = await fetch(`${API_BASE_URL}/api/job`, {
+type JobSearchParams = {
+  q?: string;
+  category?: string;
+  modality?: string;
+  location?: string;
+  board?: string;
+};
+
+export const getJobs = async (
+  token: string,
+  params: JobSearchParams = { board: "true" }
+) => {
+  const searchParams = new URLSearchParams();
+
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) searchParams.set(key, value);
+  });
+
+  const query = searchParams.toString();
+  const url = `${API_BASE_URL}/api/job${query ? `?${query}` : ""}`;
+
+  const response = await fetch(url, {
     headers: {
       Authorization: `Bearer ${token}`,
     },

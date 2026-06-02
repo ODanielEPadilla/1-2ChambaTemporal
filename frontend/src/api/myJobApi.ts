@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:3000";
+import { API_BASE_URL } from "../config/api";
 
 type CreateJobRequest = {
   client: string;
@@ -7,6 +7,11 @@ type CreateJobRequest = {
   category: string;
   modality: string;
   estimatedDuration: string;
+  location?: string;
+  city?: string;
+  compensation?: string;
+  skillsRequired?: string[];
+  vacancies?: number;
 };
 
 export const createJob = async (job: CreateJobRequest, token: string) => {
@@ -35,6 +40,11 @@ type UpdateJobRequest = {
   modality: string;
   estimatedDuration: string;
   status: string;
+  location?: string;
+  city?: string;
+  compensation?: string;
+  skillsRequired?: string[];
+  vacancies?: number;
 };
 
 export const updateJob = async (
