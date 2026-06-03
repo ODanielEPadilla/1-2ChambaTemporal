@@ -6,6 +6,27 @@ import Job from "../models/jobModel.js";
 
 dotenv.config();
 
+type JobCategory =
+  | "desarrollo web"
+  | "soporte tecnico"
+  | "base de datos"
+  | "diseño de interfaces"
+  | "otro";
+
+type JobModality = "remoto" | "presencial" | "hibrido";
+
+type SeedJob = {
+  title: string;
+  description: string;
+  category: JobCategory;
+  modality: JobModality;
+  estimatedDuration: string;
+  location: string;
+  city: string;
+  compensation: string;
+  skillsRequired: string[];
+};
+
 const clients = [
   {
     auth0Id: "seed|cliente-techzac",
@@ -33,7 +54,7 @@ const clients = [
   },
 ];
 
-const jobsByClient = [
+const jobsByClient: SeedJob[][] = [
   [
     {
       title: "Desarrollador web frontend (React)",
@@ -150,8 +171,7 @@ async function seed() {
 
   let jobsCreated = 0;
 
-  for (let index = 0; index < clients.length; index++) {
-    const clientData = clients[index];
+  for (const [index, clientData] of clients.entries()) {
     const clientJobs = jobsByClient[index] ?? [];
 
     let user = await User.findOne({ email: clientData.email });
